@@ -1,46 +1,44 @@
-name: Deploy to Amazon ECR
+
+name: Deploy Frontend Espacial to AWS ECR
 
 on:
   push:
-    branches: [ "main" ] # Executa o fluxo ao fazer push na branch main
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
-  id-token: write # Obrigatório para autenticação via OIDC
+  id-token: write
   contents: read
 
 env:
-  AWS_REGION: sa-east-1                       # Altere para a sua região da AWS
-  ECR_REPOSITORY: espacial              # Altere para o nome do repositório ECR
-  AWS_ROLE_TO_ASSUME: arn:aws:iam::715844023437:role/integraGitToECR-AWS # Altere para o ARN da Role criada.
+  AWS_REGION: sa-east-1
+  ECR_REPOSITORY: frontendespacial
 
 jobs:
   build-and-push:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::715844023437:role/GitHubActionsECRRole
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build, tag, and push image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }} # Usa o hash do commit como tag da imagem
-      run: |
-        # Constrói a imagem Docker baseada no Dockerfile da raiz do projeto
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        
-        # Envia as imagens para o registro da AWS
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
